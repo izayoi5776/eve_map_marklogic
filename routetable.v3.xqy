@@ -39,5 +39,33 @@ declare function local:level1(){
       return ()
     })
 };
+(: run level $n :)
+declare function local:doLevel($id, $n){
+  (: find all neighbor :)
+  let $self := /routetable[from=$id]
+  let $neighbor := /routetable[from=$self/route[@hop="1"]/@to]
+  (: get route level(n-1) from neighbors :)
+  (: except unknown, by me :)
+  let $routen_1 := $neighbor/route[not(@by="NOT_SET" or @by=$id)and @hop=($n - 1)]
+  (: replace routes of my table :)
+  let $oldlist := ()
+  for $i in $routen_1 return
+    let $old := $self/route[@to=$i/@to and (@by="NOT_SET" or @hop>$n)]
+    (: if 2 route to same star, use the first :)
+    let $old := if($old/@to = $oldlist) then () else $old
+    let $_ := xdmp:set($oldlist, ($old/@to, $oldlist))
+    let $new := element route{
+      attribute by{$i/../from/string()},
+      attribute to{$i/@to},
+      attribute hop{$n}
+    }
+    let $_ := xdmp:node-replace($old, $new)
+    return ()
+};
 
-local:level1()
+(: === main === :)
+map(function($a){
+  xdmp:spawn-function(function(){
+    local:doLevel($a, 2)
+  })
+}, /nodes/node/id/string())
