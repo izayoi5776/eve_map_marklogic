@@ -23,14 +23,19 @@ declare function local:initRouteTable(){
 (: fix hop1 in route table, only lvl1 need search /edges/edge :)
 declare function local:level1(){
   for $i in distinct-values(/nodes/node/id) return
-    xdmp:spawn-function(function(){
+     xdmp:spawn-function(function(){
       let $a := doc("/eve/routetable/" || $i || ".xml")/*
-      let $_ := for $j in /edges/edge[from=$i] return
-        xdmp:node-replace($a/route[to=$j], element route{
+      let $_ := for $j in /edges/edge[from=$i]/to/string() return
+        let $old := $a/route[@to=$j]
+        let $new := element route{
           attribute by{$j},
           attribute to{$j},
           attribute hop{1}
-        })
+        }
+        let $_ := xdmp:log(("old=" , $old , " new=" , $new))
+        let $_ := xdmp:node-replace($old, $new)
+        return ()
+      let $_ := xdmp:node-delete($a/route[@to=$i])
       return ()
     })
 };
