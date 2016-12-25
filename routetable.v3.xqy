@@ -1,4 +1,4 @@
-(: add all route when initialize :)
+(: add all route when hop0 :)
 declare function local:newRouteTemplete(){
   for $i in (/nodes/node/id/string()) return
       element route{
@@ -7,7 +7,7 @@ declare function local:newRouteTemplete(){
         attribute hop{0}
       }
 };
-(: èâä˙âª :)
+(: init :)
 declare function local:initRouteTable(){
   let $a := local:newRouteTemplete()
   let $rt := for $i in distinct-values(/nodes/node/id)
@@ -20,7 +20,19 @@ declare function local:initRouteTable(){
     })
   return ()
 };
-(:
-(/edges/edge)[1]
-:)
-(local:initRouteTable())
+(: fix hop1 in route table, only lvl1 need search /edges/edge :)
+declare function local:level1(){
+  for $i in distinct-values(/nodes/node/id) return
+    xdmp:spawn-function(function(){
+      let $a := doc("/eve/routetable/" || $i || ".xml")/*
+      let $_ := for $j in /edges/edge[from=$i] return
+        xdmp:node-replace($a/route[to=$j], element route{
+          attribute by{$j},
+          attribute to{$j},
+          attribute hop{1}
+        })
+      return ()
+    })
+};
+
+local:level1()
