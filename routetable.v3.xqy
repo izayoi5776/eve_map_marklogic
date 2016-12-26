@@ -62,10 +62,16 @@ declare function local:doLevel($id, $n){
     let $_ := xdmp:node-replace($old, $new)
     return ()
 };
-
+declare function local:getNextState(){
+  let $fn := "/eve/tmp/state.xml"
+  let $_ := xdmp:lock-for-update($fn)
+  let $cur := /routetablestate/data()
+  let $_ := document-insert($fn, element routetablestate{$cur + 1})
+  return $cur + 1
+};
 (: === main === :)
 map(function($a){
   xdmp:spawn-function(function(){
-    local:doLevel($a, 2)
+    local:doLevel($a,  local:getNextState())
   })
 }, /nodes/node/id/string())
