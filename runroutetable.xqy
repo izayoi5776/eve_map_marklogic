@@ -1,8 +1,12 @@
-  xquery version "1.0-ml";
+xquery version "1.0-ml";
 
-  import module namespace admin = "http://marklogic.com/xdmp/admin" 
+import module namespace admin = "http://marklogic.com/xdmp/admin" 
       at "/MarkLogic/admin.xqy";
-  declare namespace st = "http://marklogic.com/xdmp/status/server";
+
+import module namespace eve = "https://eve.marklogic.zhangxiaodong.net"
+      at "/eve/routetable.v3.xqy";
+
+declare namespace st = "http://marklogic.com/xdmp/status/server";
 
 declare function local:getJobCount(){
   let $config := admin:get-configuration()
@@ -14,18 +18,27 @@ declare function local:getJobCount(){
   return $remain
 };
 declare function local:savelog(){
-  xdmp:document-insert("/eve/tmp/routetablelog.xml",
-    element routetablelog{
-      element log{
-        attribute tm{current-dateTime()},
-        attribute jobs{local:getJobCount()}
-      }
+  xdmp:node-insert-child(doc("/eve/tmp/routetablelog.xml")/*,
+    element log{
+      attribute tm{current-dateTime()},
+      attribute jobs{local:getJobCount()}
     }
   )
 };
 
 (:
 count(/routetable/route[@by="NOT_SET"])
-:)
 
-local:savelog()
+:)
+(: === main === :)
+let $_ := local:savelog()
+let $cur := /routetablestate/data()
+return if($cur or $cur="0") then
+  if(local:getJobCount() > 1) then ()
+  else if($cur="0") then
+    eve:level1()
+  else
+    eve:runNextLevel()
+else
+  eve:initRouteTable()
+

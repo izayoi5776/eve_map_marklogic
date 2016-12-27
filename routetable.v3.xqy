@@ -1,5 +1,7 @@
+module namespace eve = "https://eve.marklogic.zhangxiaodong.net";
+
 (: add all route when hop0 :)
-declare function local:newRouteTemplete(){
+declare function newRouteTemplete(){
   for $i in (/nodes/node/id/string()) return
       element route{
         attribute by{  "NOT_SET"},
@@ -8,8 +10,12 @@ declare function local:newRouteTemplete(){
       }
 };
 (: init :)
-declare function local:initRouteTable(){
-  let $a := local:newRouteTemplete()
+declare function initRouteTable(){
+  let $_ := xdmp:log("DEBUG:initRouteTable(0)")
+  let $fn := "/eve/tmp/state.xml"
+  let $_ := xdmp:document-insert($fn, element routetablestate{0})
+
+  let $a := newRouteTemplete()
   let $rt := for $i in distinct-values(/nodes/node/id)
     return xdmp:spawn-function(function(){
       xdmp:document-insert("/eve/routetable/" || $i || ".xml", 
@@ -21,7 +27,11 @@ declare function local:initRouteTable(){
   return ()
 };
 (: fix hop1 in route table, only lvl1 need search /edges/edge :)
-declare function local:level1(){
+declare function level1(){
+  let $_ := xdmp:log("DEBUG:level1(1)")
+  let $fn := "/eve/tmp/state.xml"
+  let $_ := xdmp:document-insert($fn, element routetablestate{1})
+
   for $i in distinct-values(/nodes/node/id) return
      xdmp:spawn-function(function(){
       let $a := doc("/eve/routetable/" || $i || ".xml")/*
@@ -32,7 +42,6 @@ declare function local:level1(){
           attribute to{$j},
           attribute hop{1}
         }
-        let $_ := xdmp:log(("old=" , $old , " new=" , $new))
         let $_ := xdmp:node-replace($old, $new)
         return ()
       let $_ := xdmp:node-delete($a/route[@to=$i])
@@ -40,7 +49,7 @@ declare function local:level1(){
     })
 };
 (: run level $n :)
-declare function local:doLevel($id, $n){
+declare function doLevel($id, $n){
   (: find all neighbor :)
   let $self := /routetable[from=$id]
   let $neighbor := /routetable[from=$self/route[@hop="1"]/@to]
@@ -62,16 +71,20 @@ declare function local:doLevel($id, $n){
     let $_ := xdmp:node-replace($old, $new)
     return ()
 };
-declare function local:getNextState(){
+declare function getNextState(){
   let $fn := "/eve/tmp/state.xml"
   let $_ := xdmp:lock-for-update($fn)
   let $cur := /routetablestate/data()
-  let $_ := document-insert($fn, element routetablestate{$cur + 1})
+  let $_ := xdmp:document-insert($fn, element routetablestate{$cur + 1})
   return $cur + 1
 };
 (: === main === :)
-map(function($a){
-  xdmp:spawn-function(function(){
-    local:doLevel($a,  local:getNextState())
-  })
-}, /nodes/node/id/string())
+declare function runNextLevel(){
+  let $n := getNextState()
+  let $_ := xdmp:log("DEBUG:runNextLevel(" || $n || ")")
+  return map(function($a){
+    xdmp:spawn-function(function(){
+      doLevel($a, $n)
+    })
+  }, /nodes/node/id/string())
+};
