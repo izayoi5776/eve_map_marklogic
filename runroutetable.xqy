@@ -14,7 +14,7 @@ declare function local:getJobCount(){
 
   let $remain := (xdmp:server-status(xdmp:host(),$id)/st:queue-size +
    count(xdmp:server-status(xdmp:host(),$id)//st:request-status))
-  let $_ := xdmp:log("DEBUG:jobs remain:[" || $remain || "]")
+  let $_ := xdmp:log("DEBUG:jobs remain:[" || $remain || "] at level [" || /routetablestate/string() || "]")
   return $remain
 };
 declare function local:savelog(){

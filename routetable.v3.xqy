@@ -49,7 +49,7 @@ declare function level1(){
     })
 };
 (: run level $n :)
-declare function doLevel($id, $n){
+declare function doLevel_old($id, $n){
   (: find all neighbor :)
   let $self := /routetable[from=$id]
   let $neighbor := /routetable[from=$self/route[@hop="1"]/@to]
@@ -60,6 +60,39 @@ declare function doLevel($id, $n){
   let $oldlist := ()
   for $i in $routen_1 return
     let $old := $self/route[@to=$i/@to and (@by="NOT_SET" or @hop>$n)]
+    (: if 2 route to same star, use the first :)
+    let $old := if($old/@to = $oldlist) then () else $old
+    let $_ := xdmp:set($oldlist, ($old/@to, $oldlist))
+    let $new := element route{
+      attribute by{$i/../from/string()},
+      attribute to{$i/@to},
+      attribute hop{$n}
+    }
+    let $_ := xdmp:node-replace($old, $new)
+    return ()
+};
+(: run level $n :)
+declare function doLevel($id, $n){
+  (: find all neighbor :)
+  let $n := xs:decimal($n)
+  let $self := /routetable[from=$id]
+  let $neighbor := /routetable[from=$self/route[@hop="1"]/@to]
+  (: get route level(n-1) from neighbors :)
+  (: except unknown, by me :)
+  let $routen_1 := $neighbor/route[not(@by="NOT_SET" or @by=$id)and @hop=($n - 1)]
+  (: replace routes of my table :)
+  let $oldlist := ()
+  for $i in $routen_1 return
+    (: let $old := $self/route[@to=$i/@to and (@by="NOT_SET" or @hop>$n)] :)
+    let $old := cts:search(doc("/eve/routetable/" || $id || ".xml")/routetable/route,
+      cts:and-query((
+        cts:element-attribute-word-query(xs:QName("route"), xs:QName("to"), $i/@to),
+        cts:or-query((
+          cts:element-attribute-word-query(xs:QName("route"), xs:QName("by"), "NOT_SET"),
+          cts:element-attribute-range-query(xs:QName("route"), xs:QName("hop"), ">", $n)
+        ))
+      ))
+    )
     (: if 2 route to same star, use the first :)
     let $old := if($old/@to = $oldlist) then () else $old
     let $_ := xdmp:set($oldlist, ($old/@to, $oldlist))
